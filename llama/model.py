@@ -224,22 +224,40 @@ class Attention(nn.Module):
             bias=False,
         )
 
-        self.cache_k = torch.zeros(
-            (
-                args.max_batch_size,
-                args.max_seq_len,
-                self.n_local_kv_heads,
-                self.head_dim,
+        if torch.cuda.is_available():
+            self.cache_k = torch.zeros(
+                (
+                    args.max_batch_size,
+                    args.max_seq_len,
+                    self.n_local_kv_heads,
+                    self.head_dim,
+                )
+            ).cuda()
+            self.cache_v = torch.zeros(
+                (
+                    args.max_batch_size,
+                    args.max_seq_len,
+                    self.n_local_kv_heads,
+                    self.head_dim,
+                )
+            ).cuda()
+        else:
+            self.cache_k = torch.zeros(
+                (
+                    args.max_batch_size,
+                    args.max_seq_len,
+                    self.n_local_kv_heads,
+                    self.head_dim,
+                )
             )
-        ).cuda()
-        self.cache_v = torch.zeros(
-            (
-                args.max_batch_size,
-                args.max_seq_len,
-                self.n_local_kv_heads,
-                self.head_dim,
+            self.cache_v = torch.zeros(
+                (
+                    args.max_batch_size,
+                    args.max_seq_len,
+                    self.n_local_kv_heads,
+                    self.head_dim,
+                )
             )
-        ).cuda()
 
     def forward(
         self,
@@ -343,7 +361,7 @@ class MoE(nn.Module):
         **kwargs,
     ):
         super().__init__()
-        self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//num_shards}") for i in range(num_experts)])
+        self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//4}") for i in range(num_experts)]) if torch.cuda.is_available() else nn.ModuleList([FeedForward(**kwargs).to(f"mps:0") for i in range(num_experts)])
         self.gate = nn.Linear(kwargs["dim"], num_experts, bias=False)
         self.num_experts_per_tok = num_experts_per_tok
 
