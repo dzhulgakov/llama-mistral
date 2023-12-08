@@ -342,6 +342,7 @@ class MoE(nn.Module):
     ):
         super().__init__()
         self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//4}") for i in range(num_experts)])
+        self.num_experts = num_experts
         self.gate = nn.Linear(kwargs["dim"], num_experts, bias=False)
         self.num_experts_per_tok = num_experts_per_tok
 
@@ -353,12 +354,28 @@ class MoE(nn.Module):
         expert_weights, expert_indices = torch.topk(scores, self.num_experts_per_tok, dim=-1)
         flat_expert_indices = expert_indices.view(-1)
 
+        # Implementing load balancing
+        load_balancing_loss = self.calculate_load_balancing_loss(expert_indices)
+
         x = x.repeat_interleave(self.num_experts_per_tok, dim=0)
         y = torch.empty_like(x)
         for i, expert in enumerate(self.experts):
             y[flat_expert_indices == i] = expert(x[flat_expert_indices == i])
         y = (y.view(*expert_weights.shape, -1) * expert_weights.unsqueeze(-1)).sum(dim=1)
-        return y.view(*orig_shape)
+
+        # Return output and load balancing loss
+        return y.view(*orig_shape), load_balancing_loss
+
+    def calculate_load_balancing_loss(self, expert_indices):
+        # Count tokens assigned to each expert
+        expert_counts = torch.zeros(self.num_experts, device=expert_indices.device)
+        for i in range(self.num_experts):
+            expert_counts[i] = (expert_indices == i).sum()
+
+        # Calculate variance for load balancing
+        mean_expert_count = expert_counts.mean()
+        variance = ((expert_counts - mean_expert_count) ** 2).mean()
+        return variance
 
 
 class TransformerBlock(nn.Module):
