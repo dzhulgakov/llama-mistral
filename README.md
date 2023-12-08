@@ -2,26 +2,28 @@
 
 Mistral dropped the new MoE model this morning: https://twitter.com/MistralAI/status/1733150512395038967
 
-This is an attempt to hack original Llama codebase to load it.
+This is an attempt to hack original Llama codebase to load it. The implementation is very naive and slow.
 
-You need 2 x 80Gb cards to load it.
+You need 2 x 80Gb or 4 x 40Gb cards to load it.
 
 Implementation:
 * remove model parallelism for simplicity
-* shard experts in 2 gpus
-* reverse engineer MoE implementation based on https://arxiv.org/pdf/2211.15841.pdf
+* shard experts in the specified number of GPUs
+* reverse engineer MoE implementation based on https://arxiv.org/pdf/2211.15841.pdf (seems vanilla MoE)
 
-WARNING: implementation might be wrong but at least the generation is coherent :)
+**WARNING**: There's no official reference model code. This implementation might be wrong. At least the generation looks coherent which is a good sign :)
 
 ## Usage
 
 Download the weights for Mixtral from HF or Torrent. HF is the easiest: https://huggingface.co/someone13574/mixtral-8x7b-32kseqlen/tree/main . Make sure you consolidate the weights
 
-Run:
+Run with 2 GPUs (~45GB required in each):
 
 ```bash
 python example_text_completion.py path/to/mixtral/ path/to/mixtral/tokenizer.model
 ```
+
+To run with 4 GPUs pass `--num-gpus 4`.
 
 Edit prompt in the example if needed.
 

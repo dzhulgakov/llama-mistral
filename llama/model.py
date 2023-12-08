@@ -25,6 +25,7 @@ class ModelArgs:
     max_seq_len: int = 32768
 
     moe: Optional[Dict[str, int]] = None
+    num_gpus: int = 1
 
 ROPE_THETA = 1e6
 
@@ -338,10 +339,11 @@ class MoE(nn.Module):
         self,
         num_experts: int,
         num_experts_per_tok: int,
+        num_shards: int,
         **kwargs,
     ):
         super().__init__()
-        self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//4}") for i in range(num_experts)])
+        self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//num_shards}") for i in range(num_experts)])
         self.num_experts = num_experts
         self.gate = nn.Linear(kwargs["dim"], num_experts, bias=False)
         self.num_experts_per_tok = num_experts_per_tok
@@ -403,9 +405,11 @@ class TransformerBlock(nn.Module):
         self.dim = args.dim
         self.head_dim = args.dim // args.n_heads
         self.attention = Attention(args)
+        assert args.moe["num_experts"] % args.num_gpus == 0, "num_experts must be divisible by num_gpus"
         self.feed_forward = MoE(
             dim=args.dim,
             hidden_dim=args.hidden_dim,
+            num_shards=args.moe["num_experts"] // args.num_gpus,
             **args.moe,
         )
         self.layer_id = layer_id

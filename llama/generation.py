@@ -50,6 +50,7 @@ class Llama:
         tokenizer_path: str,
         max_seq_len: int,
         max_batch_size: int,
+        num_gpus: int,
         model_parallel_size: Optional[int] = None,
         seed: int = 1,
     ) -> "Llama":
@@ -78,14 +79,8 @@ class Llama:
         """
         model_parallel_size = 1
 
-        local_rank = int(os.environ.get("LOCAL_RANK", 0))
-        torch.cuda.set_device(local_rank)
-
         # seed must be the same in all processes
         torch.manual_seed(seed)
-
-        if local_rank > 0:
-            sys.stdout = open(os.devnull, "w")
 
         start_time = time.time()
         checkpoints = sorted(Path(ckpt_dir).glob("*.pth"))
@@ -100,13 +95,14 @@ class Llama:
         model_args: ModelArgs = ModelArgs(
             max_seq_len=max_seq_len,
             max_batch_size=max_batch_size,
+            num_gpus=num_gpus,
             **params,
         )
         tokenizer = Tokenizer(model_path=tokenizer_path)
         model_args.vocab_size = tokenizer.n_words
         torch.set_default_tensor_type(torch.cuda.HalfTensor)
         model = Transformer(model_args)
-        print("=== created Mixtral 8x7B")
+        print(f"=== created Mixtral 8x7B. Experts spread over {num_gpus} GPUs ===")
         checkpoint = torch.load(ckpt_path, map_location="cpu")
         model.load_state_dict(checkpoint, strict=False)
         print(f"Loaded in {time.time() - start_time:.2f} seconds")
