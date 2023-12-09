@@ -361,7 +361,7 @@ class MoE(nn.Module):
         **kwargs,
     ):
         super().__init__()
-        self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//4}") for i in range(num_experts)]) if torch.cuda.is_available() else nn.ModuleList([FeedForward(**kwargs).to(f"mps:0") for i in range(num_experts)])
+        self.experts = nn.ModuleList([FeedForward(**kwargs).to(f"cuda:{i//4}") for i in range(num_shards)]) if torch.cuda.is_available() else nn.ModuleList([FeedForward(**kwargs) for i in range(num_shards)])
         self.gate = nn.Linear(kwargs["dim"], num_experts, bias=False)
         self.num_experts_per_tok = num_experts_per_tok
 

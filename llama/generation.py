@@ -79,16 +79,16 @@ class Llama:
         """
         model_parallel_size = 1
 
-        local_rank = int(os.environ.get("LOCAL_RANK", 0))
-
-        if torch.backends.mps.is_available():
-            print ("Using MPS")
-            device = torch.device("mps")
-            device = "mps:0"
+        if torch.cuda.is_available():
+            print ("Using CUDA backend")
+            torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            print ("Using MPS backend")
+            torch.device("mps")
+            num_gpus = 1
         else:
-            print ("Using CUDA")
-            torch.cuda.set_device(local_rank)
-            device = "cuda"
+            print ("Using CPU backend")
+            torch.device("cpu")
 
         # seed must be the same in all processes
         torch.manual_seed(seed)
@@ -111,7 +111,7 @@ class Llama:
         )
         tokenizer = Tokenizer(model_path=tokenizer_path)
         model_args.vocab_size = tokenizer.n_words
-        if device == "cuda":
+        if torch.cuda.is_available():
             torch.set_default_tensor_type(torch.cuda.HalfTensor)
         else:
             torch.set_default_tensor_type(torch.HalfTensor)
